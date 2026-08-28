@@ -7,6 +7,7 @@
 ![Ursina Engine](https://img.shields.io/badge/engine-Ursina%208.3-cyan.svg)
 ![Framerate](https://img.shields.io/badge/framerate-60%20FPS%20Locked-brightgreen.svg)
 ![Theme](https://img.shields.io/badge/theme-Dark%20Synthwave-magenta.svg)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blueviolet.svg)
 
 A high-speed, dark-themed 3D endless runner game built in Python with the **Ursina Engine**.
 
@@ -65,6 +66,25 @@ pip install -r requirements.txt
 ### 3. Launch the game
 ```bash
 python main.py
+```
+
+---
+
+## 📦 Build Standalone Windows EXE
+
+You can package the entire game into a standalone `.exe` without needing Python installed on the target machine:
+
+### Option A: 1-Click Batch Script
+Double click **`build_exe.bat`** (or run `.\build_exe.bat` in your terminal).
+
+### Option B: Python Build Script
+```bash
+python build_exe.py
+```
+
+The output executable and asset folder will be generated at:
+```
+dist/CyberSurge3D/CyberSurge3D.exe
 ```
 
 ---
