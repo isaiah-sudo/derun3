@@ -180,7 +180,7 @@ class CyberSurgeGame:
                 self.current_mode_index = (self.current_mode_index + 1) % len(GAME_MODES)
                 self.ui_mgr.mode_index = self.current_mode_index
                 m = GAME_MODES[self.current_mode_index]
-                self.ui_mgr.mode_label.text = '[ MODE: OVERDRIVE 🔥 ]' if self.current_mode_index == 1 else '[ MODE: CLASSIC ]'
+                self.ui_mgr.mode_label.text = '[ MODE: OVERDRIVE ]' if self.current_mode_index == 1 else '[ MODE: CLASSIC ]'
                 self.ui_mgr.mode_label.color = color.orange if self.current_mode_index == 1 else color.cyan
                 self.ui_mgr.mode_desc.text = m['description']
                 self.ui_mgr.hs_label.text = f"HIGH SCORE: {self.hs_mgr.get_high_score(self.current_mode_index):,}   |   RUNS: {self.hs_mgr.runs_played}"
@@ -413,17 +413,17 @@ class CyberSurgeGame:
                 curr_biome = self.track_mgr.get_current_biome()
                 self.apply_dark_theme(curr_biome)
 
-            # Update HUD status with stacking charges
+            # Update HUD status with clean cyber ASCII badges
             powerup_msg = ''
             if self.player.is_boosting:
                 stack_str = f' x{self.player.boost_stacks}' if self.player.boost_stacks > 1 else ''
-                powerup_msg += f'⚡ HYPERDRIVE{stack_str} [{self.player.boost_timer:.1f}s]  '
+                powerup_msg += f'[BOOST{stack_str}: {self.player.boost_timer:.1f}s]  '
             if self.player.has_shield:
                 stack_str = f' x{self.player.shield_charges}' if self.player.shield_charges > 1 else ''
-                powerup_msg += f'🛡️ SHIELD{stack_str} [{self.player.shield_timer:.1f}s]  '
+                powerup_msg += f'[SHIELD{stack_str}: {self.player.shield_timer:.1f}s]  '
             if self.player.has_magnet:
                 stack_str = f' x{self.player.magnet_stacks}' if self.player.magnet_stacks > 1 else ''
-                powerup_msg += f'🧲 MAGNET{stack_str} [{self.player.magnet_timer:.1f}s]'
+                powerup_msg += f'[MAGNET{stack_str}: {self.player.magnet_timer:.1f}s]'
 
             self.ui_mgr.update_hud(
                 score=self.score,

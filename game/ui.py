@@ -140,7 +140,7 @@ class UIManager:
         # Mode Selector
         def update_mode_ui():
             m = GAME_MODES[self.mode_index]
-            mode_tag = '[ MODE: OVERDRIVE 🔥 ]' if self.mode_index == 1 else '[ MODE: CLASSIC ]'
+            mode_tag = '[ MODE: OVERDRIVE ]' if self.mode_index == 1 else '[ MODE: CLASSIC ]'
             mode_color = color.orange if self.mode_index == 1 else color.cyan
             self.mode_label.text = mode_tag
             self.mode_label.color = mode_color
