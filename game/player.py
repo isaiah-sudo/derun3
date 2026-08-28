@@ -36,22 +36,23 @@ class Player(Entity):
         self.build_model()
 
     def build_model(self):
-        # Clear existing children if re-building
         for child in list(self.children):
             destroy(child)
 
         pri_col = self.skin_data['primary']
         sec_col = self.skin_data['secondary']
+        hull_dark = color.hex('#161420')
+        thruster_glow = color.hex('#00e5ff')
 
-        # Central hovercraft fuselage
+        # Central hovercraft fuselage (dark cyber carbon)
         self.body = Entity(
             parent=self,
             model='cube',
-            color=color.rgb(25, 25, 35),
+            color=hull_dark,
             scale=(1.2, 0.45, 2.2),
             position=(0, 0, 0)
         )
-        # Cockpit canopy
+        # Cockpit canopy (neon tinted glass)
         self.cockpit = Entity(
             parent=self,
             model='sphere',
@@ -59,7 +60,7 @@ class Player(Entity):
             scale=(0.7, 0.4, 1.1),
             position=(0, 0.28, 0.2)
         )
-        # Left wing
+        # Left wing with primary skin color
         self.left_wing = Entity(
             parent=self,
             model='cube',
@@ -68,7 +69,7 @@ class Player(Entity):
             position=(-1.0, 0.0, -0.2),
             rotation_z=-8
         )
-        # Right wing
+        # Right wing with primary skin color
         self.right_wing = Entity(
             parent=self,
             model='cube',
@@ -77,22 +78,22 @@ class Player(Entity):
             position=(1.0, 0.0, -0.2),
             rotation_z=8
         )
-        # Left & Right Thruster nozzles
+        # Left & Right Glowing Plasma Thruster nozzles
         self.thruster_l = Entity(
             parent=self,
             model='cube',
-            color=color.white,
+            color=thruster_glow,
             scale=(0.3, 0.3, 0.5),
             position=(-0.45, 0.0, -1.1)
         )
         self.thruster_r = Entity(
             parent=self,
             model='cube',
-            color=color.white,
+            color=thruster_glow,
             scale=(0.3, 0.3, 0.5),
             position=(0.45, 0.0, -1.1)
         )
-        # Shield Bubble (hidden by default)
+        # Shield Bubble
         self.shield_bubble = Entity(
             parent=self,
             model='sphere',
@@ -102,7 +103,7 @@ class Player(Entity):
             position=(0, 0.2, 0),
             enabled=False
         )
-        # Magnet Aura (hidden by default)
+        # Magnet Aura
         self.magnet_aura = Entity(
             parent=self,
             model='quad',
@@ -146,7 +147,6 @@ class Player(Entity):
             self.is_sliding = True
             self.slide_timer = SLIDE_DURATION
             if not self.is_grounded:
-                # Fast dive downwards
                 self.vy = -JUMP_FORCE * 1.5
             return True
         return False
@@ -166,15 +166,12 @@ class Player(Entity):
         self.boost_timer = duration
 
     def update_player(self, dt):
-        # 1. Smooth Lane Shift Interpolation
         dx = self.target_x - self.x
         self.x += dx * LANE_LERP_SPEED * dt
 
-        # Visual banking roll angle
         target_roll = -dx * 8.0
         self.rotation_z += (target_roll - self.rotation_z) * 12.0 * dt
 
-        # 2. Jump / Vertical Physics
         if not self.is_grounded:
             self.vy -= GRAVITY * dt
             self.y += self.vy * dt
@@ -184,13 +181,10 @@ class Player(Entity):
                 self.is_grounded = True
                 self.rotation_x = 0
             else:
-                # Pitch nose up when ascending, down when descending
                 self.rotation_x = -self.vy * 1.5
         else:
-            # Gentle hover bobbing
             self.y = 0.5 + 0.08 * math.sin(time.time() * 6.0)
 
-        # 3. Slide Handling
         if self.is_sliding:
             self.slide_timer -= dt
             self.scale_y = 0.45
@@ -202,7 +196,6 @@ class Player(Entity):
         else:
             self.scale_y = 1.0
 
-        # 4. Powerup Timers
         if self.has_shield:
             self.shield_timer -= dt
             self.shield_bubble.rotation_y += 90.0 * dt
@@ -219,7 +212,6 @@ class Player(Entity):
 
         if self.is_boosting:
             self.boost_timer -= dt
-            # Thruster flicker
             flicker = 1.2 + 0.4 * math.sin(time.time() * 30.0)
             self.thruster_l.scale_z = 0.5 * flicker
             self.thruster_r.scale_z = 0.5 * flicker

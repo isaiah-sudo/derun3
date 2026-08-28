@@ -27,7 +27,7 @@ class TrackSegment(Entity):
         b = self.biome
         road_width = 11.5
 
-        # 1. Main road floor slab
+        # 1. Main road floor slab (dark cyber asphalt)
         Entity(
             parent=self,
             model='cube',
@@ -36,7 +36,7 @@ class TrackSegment(Entity):
             position=(0, -0.2, SEGMENT_LENGTH / 2)
         )
 
-        # 2. Lane dividers
+        # 2. Glowing Lane Dividers
         for x_line in [-1.7, 1.7]:
             Entity(
                 parent=self,
@@ -69,25 +69,22 @@ class TrackSegment(Entity):
             Entity(parent=self, model='cube', color=b['accent_color'], scale=(0.4, 5.0, 0.4), position=(5.5, 2.5, arch_z))
             Entity(parent=self, model='cube', color=b['rail_color'], scale=(11.4, 0.4, 0.4), position=(0, 5.0, arch_z))
 
-        # 5. Background Floating Cyber Skyscrapers
+        # 5. Background Floating Cyber Skyscrapers (Dark Obsidian monoliths)
+        building_dark = color.hex('#0b0914')
         for _ in range(2):
             side = -1 if random.random() < 0.5 else 1
             dist_x = side * random.uniform(18.0, 42.0)
             dist_z = random.uniform(2.0, SEGMENT_LENGTH - 2.0)
             height = random.uniform(25.0, 60.0)
             width = random.uniform(6.0, 12.0)
-            bg_col = color.rgb(
-                int(b['track_color'].r * 255 * 0.8),
-                int(b['track_color'].g * 255 * 0.8),
-                int(b['track_color'].b * 255 * 0.8)
-            )
             building = Entity(
                 parent=self,
                 model='cube',
-                color=bg_col,
+                color=building_dark,
                 scale=(width, height, width),
                 position=(dist_x, height / 2 - 8, dist_z)
             )
+            # Glowing neon accent band on skyscraper
             Entity(
                 parent=building,
                 model='cube',
@@ -96,10 +93,10 @@ class TrackSegment(Entity):
                 position=(0, 0.2, 0)
             )
 
-        # Combine all static pieces into 1 single efficient mesh
+        # Combine all static pieces into 1 single efficient mesh with vertex colors
         self.combine(auto_destroy=True)
 
-        # 6. Spawn Obstacles & Collectibles if not a safe starting zone
+        # 6. Spawn Obstacles & Collectibles
         if not self.is_safe:
             self.spawn_content()
 
@@ -109,16 +106,15 @@ class TrackSegment(Entity):
         pattern_type = random.random()
 
         if pattern_type < 0.40:
-            # Single hazard in 1 lane, other 2 lanes have coin lines
             hazard_lane = random.choice(available_lanes)
             hz_pos = Vec3(LANE_POSITIONS[hazard_lane], 0, self.z + SEGMENT_LENGTH * 0.5)
             h_type = random.choice(['hurdle', 'high', 'pylon'])
             if h_type == 'hurdle':
-                h = LaserHurdle(position=hz_pos, theme_color=b['rail_color'])
+                h = LaserHurdle(position=hz_pos)
             elif h_type == 'high':
-                h = HighBarrier(position=hz_pos, theme_color=b['sun_color'])
+                h = HighBarrier(position=hz_pos)
             else:
-                h = PylonHazard(position=hz_pos, theme_color=b['accent_color'])
+                h = PylonHazard(position=hz_pos)
             self.hazards.append(h)
 
             for l_idx in available_lanes:
@@ -128,21 +124,18 @@ class TrackSegment(Entity):
                         self.items.append(Collectible(item_type='shard', position=c_pos))
 
         elif pattern_type < 0.70:
-            # Two lanes blocked, 1 guaranteed wide clear lane with powerup / bonus
             clear_lane = random.choice(available_lanes)
             blocked_lanes = [l for l in available_lanes if l != clear_lane]
             
-            # Spawn hurdles/barriers in the blocked lanes
             for l_idx in blocked_lanes:
                 hz_pos = Vec3(LANE_POSITIONS[l_idx], 0, self.z + SEGMENT_LENGTH * 0.5)
                 h_kind = random.choice(['hurdle', 'high'])
                 if h_kind == 'hurdle':
-                    h = LaserHurdle(position=hz_pos, theme_color=b['rail_color'])
+                    h = LaserHurdle(position=hz_pos)
                 else:
-                    h = HighBarrier(position=hz_pos, theme_color=b['sun_color'])
+                    h = HighBarrier(position=hz_pos)
                 self.hazards.append(h)
 
-            # Spawn crystal or rare powerup in clear lane
             pickup_roll = random.random()
             item_kind = 'shard'
             if pickup_roll < 0.15:
@@ -155,16 +148,14 @@ class TrackSegment(Entity):
             self.items.append(Collectible(item_type=item_kind, position=c_pos))
 
         elif pattern_type < 0.88:
-            # Standalone moving drone hazard (no other obstacles in this segment to ensure clear dodging)
             drone_pos = Vec3(0, 0, self.z + SEGMENT_LENGTH * 0.5)
-            d = DroneHazard(position=drone_pos, speed=random.uniform(2.6, 3.8), theme_color=b['sun_color'])
+            d = DroneHazard(position=drone_pos, speed=random.uniform(2.6, 3.8))
             self.hazards.append(d)
             for l_idx in available_lanes:
                 c_pos = Vec3(LANE_POSITIONS[l_idx], 0.7, self.z + SEGMENT_LENGTH * 0.7)
                 self.items.append(Collectible(item_type='shard', position=c_pos))
 
         else:
-            # Bonus coin line across all lanes
             for l_idx in available_lanes:
                 for k in range(3):
                     c_pos = Vec3(LANE_POSITIONS[l_idx], 0.7, self.z + SEGMENT_LENGTH * 0.2 + k * 3.0)
@@ -201,7 +192,7 @@ class TrackManager:
         self.clear()
         self.next_z = -SEGMENT_LENGTH
         for i in range(SEGMENTS_AHEAD):
-            is_safe = (i < 4)  # First 4 segments (~96m) are completely safe
+            is_safe = (i < 4)
             seg = TrackSegment(z_pos=self.next_z, biome=self.get_current_biome(), is_safe=is_safe)
             self.segments.append(seg)
             self.next_z += SEGMENT_LENGTH
