@@ -4,7 +4,7 @@ from ursina import Entity, Vec3, color, destroy, held_keys
 from ursina import time as ursina_time
 from game.config import (
     LANE_POSITIONS, JUMP_FORCE, GRAVITY, SLIDE_DURATION,
-    LANE_LERP_SPEED, SHIP_SKINS, BOOST_SPEED_MULTIPLIER
+    LANE_LERP_SPEED, SHIP_SKINS
 )
 
 class Player(Entity):
@@ -21,13 +21,18 @@ class Player(Entity):
         self.is_sliding = False
         self.slide_timer = 0.0
 
-        # Powerups state
+        # Powerups state & Stacking
         self.has_shield = False
         self.shield_timer = 0.0
+        self.shield_charges = 0
+
         self.has_magnet = False
         self.magnet_timer = 0.0
+        self.magnet_stacks = 0
+
         self.is_boosting = False
         self.boost_timer = 0.0
+        self.boost_stacks = 0
 
         # Stats
         self.skin_index = skin_index % len(SHIP_SKINS)
@@ -44,7 +49,7 @@ class Player(Entity):
         hull_dark = color.hex('#161420')
         thruster_glow = color.hex('#00e5ff')
 
-        # Central hovercraft fuselage (dark cyber carbon)
+        # Central hovercraft fuselage
         self.body = Entity(
             parent=self,
             model='cube',
@@ -52,7 +57,7 @@ class Player(Entity):
             scale=(1.2, 0.45, 2.2),
             position=(0, 0, 0)
         )
-        # Cockpit canopy (neon tinted glass)
+        # Cockpit canopy
         self.cockpit = Entity(
             parent=self,
             model='sphere',
@@ -60,7 +65,7 @@ class Player(Entity):
             scale=(0.7, 0.4, 1.1),
             position=(0, 0.28, 0.2)
         )
-        # Left wing with primary skin color
+        # Left wing
         self.left_wing = Entity(
             parent=self,
             model='cube',
@@ -69,7 +74,7 @@ class Player(Entity):
             position=(-1.0, 0.0, -0.2),
             rotation_z=-8
         )
-        # Right wing with primary skin color
+        # Right wing
         self.right_wing = Entity(
             parent=self,
             model='cube',
@@ -78,7 +83,7 @@ class Player(Entity):
             position=(1.0, 0.0, -0.2),
             rotation_z=8
         )
-        # Left & Right Glowing Plasma Thruster nozzles
+        # Left & Right Thruster nozzles
         self.thruster_l = Entity(
             parent=self,
             model='cube',
@@ -151,19 +156,46 @@ class Player(Entity):
             return True
         return False
 
-    def activate_shield(self, duration=15.0):
+    def activate_shield(self, duration=15.0, stack=False):
         self.has_shield = True
-        self.shield_timer = duration
+        if stack:
+            self.shield_charges += 1
+            self.shield_timer += duration
+        else:
+            self.shield_charges = 1
+            self.shield_timer = duration
         self.shield_bubble.enabled = True
+        self.shield_bubble.scale = 3.2 + min(1.2, self.shield_charges * 0.3)
 
-    def activate_magnet(self, duration=8.0):
+    def consume_shield_charge(self):
+        self.shield_charges = max(0, self.shield_charges - 1)
+        if self.shield_charges <= 0:
+            self.has_shield = False
+            self.shield_timer = 0.0
+            self.shield_bubble.enabled = False
+        else:
+            self.shield_bubble.scale = 3.2 + min(1.2, self.shield_charges * 0.3)
+        return self.shield_charges
+
+    def activate_magnet(self, duration=8.0, stack=False):
         self.has_magnet = True
-        self.magnet_timer = duration
+        if stack:
+            self.magnet_stacks = min(4, self.magnet_stacks + 1)
+            self.magnet_timer += duration
+        else:
+            self.magnet_stacks = 1
+            self.magnet_timer = duration
         self.magnet_aura.enabled = True
+        self.magnet_aura.scale = 3.6 + (self.magnet_stacks * 0.8)
 
-    def activate_boost(self, duration=5.0):
+    def activate_boost(self, duration=5.0, stack=False):
         self.is_boosting = True
-        self.boost_timer = duration
+        if stack:
+            self.boost_stacks = min(4, self.boost_stacks + 1)
+            self.boost_timer += duration
+        else:
+            self.boost_stacks = 1
+            self.boost_timer = duration
 
     def update_player(self, dt):
         dx = self.target_x - self.x
@@ -201,6 +233,7 @@ class Player(Entity):
             self.shield_bubble.rotation_y += 90.0 * dt
             if self.shield_timer <= 0:
                 self.has_shield = False
+                self.shield_charges = 0
                 self.shield_bubble.enabled = False
 
         if self.has_magnet:
@@ -208,14 +241,17 @@ class Player(Entity):
             self.magnet_aura.rotation_z += 180.0 * dt
             if self.magnet_timer <= 0:
                 self.has_magnet = False
+                self.magnet_stacks = 0
                 self.magnet_aura.enabled = False
 
         if self.is_boosting:
             self.boost_timer -= dt
-            flicker = 1.2 + 0.4 * math.sin(time.time() * 30.0)
+            intensity = 1.0 + (self.boost_stacks * 0.3)
+            flicker = (1.2 + 0.4 * math.sin(time.time() * 30.0)) * intensity
             self.thruster_l.scale_z = 0.5 * flicker
             self.thruster_r.scale_z = 0.5 * flicker
             if self.boost_timer <= 0:
                 self.is_boosting = False
+                self.boost_stacks = 0
                 self.thruster_l.scale_z = 0.5
                 self.thruster_r.scale_z = 0.5

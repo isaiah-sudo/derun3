@@ -1,5 +1,5 @@
 ﻿from ursina import Entity, Text, Button, color, camera, Vec2, Vec3, destroy
-from game.config import SHIP_SKINS
+from game.config import SHIP_SKINS, GAME_MODES
 
 def destroy_entity_tree(entity):
     if not entity:
@@ -17,18 +17,22 @@ class UIManager:
         self.gameover_root = None
 
         self.score_text = None
+        self.mode_badge_text = None
         self.high_score_text = None
         self.multiplier_text = None
         self.speed_text = None
         self.powerup_text = None
         self.skin_index = 0
+        self.mode_index = 0
 
-    def init_hud(self):
+    def init_hud(self, mode_index=0):
         if self.hud_root:
             destroy_entity_tree(self.hud_root)
         self.hud_root = Entity(parent=camera.ui)
+        self.mode_index = mode_index
+        mode_data = GAME_MODES[mode_index]
 
-        # Top Left: Score & Multiplier
+        # Top Left: Score, Multiplier & Mode Badge
         self.score_text = Text(
             parent=self.hud_root,
             text='SCORE: 0',
@@ -43,11 +47,22 @@ class UIManager:
             scale=1.1,
             color=color.yellow
         )
+        
+        mode_col = color.orange if mode_index == 1 else color.cyan
+        mode_label = f"MODE: {mode_data['name']} // {mode_data['tag']}"
+        self.mode_badge_text = Text(
+            parent=self.hud_root,
+            text=mode_label,
+            position=(-0.82, 0.34),
+            scale=1.0,
+            color=mode_col
+        )
 
         # Top Right: High Score & Speed
+        best_val = self.hs_mgr.get_high_score(mode_index)
         self.high_score_text = Text(
             parent=self.hud_root,
-            text=f'BEST: {self.hs_mgr.high_score}',
+            text=f'BEST: {best_val:,}',
             position=(0.55, 0.44),
             scale=1.2,
             color=color.magenta
@@ -66,7 +81,7 @@ class UIManager:
             text='',
             origin=(0, 0),
             position=(0, -0.4),
-            scale=1.4,
+            scale=1.35,
             color=color.orange
         )
 
@@ -90,7 +105,7 @@ class UIManager:
         if self.hud_root:
             self.hud_root.enabled = show
 
-    def show_menu(self, on_start, on_skin_change):
+    def show_menu(self, on_start, on_skin_change, on_mode_change):
         self.hide_all()
         self.menu_root = Entity(parent=camera.ui)
 
@@ -99,7 +114,7 @@ class UIManager:
             parent=self.menu_root,
             text='C Y B E R S U R G E   3 D',
             origin=(0, 0),
-            position=(0, 0.32),
+            position=(0, 0.34),
             scale=2.2,
             color=color.cyan
         )
@@ -107,19 +122,61 @@ class UIManager:
             parent=self.menu_root,
             text='// SYNTHWAVE ENDLESS RUNNER //',
             origin=(0, 0),
-            position=(0, 0.25),
+            position=(0, 0.28),
             scale=1.1,
             color=color.magenta
         )
 
-        # Highscore display
-        Text(
+        # Highscore display for selected mode
+        self.hs_label = Text(
             parent=self.menu_root,
-            text=f'HIGH SCORE: {self.hs_mgr.high_score:,}   |   RUNS: {self.hs_mgr.runs_played}',
+            text=f'HIGH SCORE: {self.hs_mgr.get_high_score(self.mode_index):,}   |   RUNS: {self.hs_mgr.runs_played}',
             origin=(0, 0),
-            position=(0, 0.16),
+            position=(0, 0.20),
             scale=1.1,
             color=color.yellow
+        )
+
+        # Mode Selector
+        def update_mode_ui():
+            m = GAME_MODES[self.mode_index]
+            mode_tag = '[ MODE: OVERDRIVE 🔥 ]' if self.mode_index == 1 else '[ MODE: CLASSIC ]'
+            mode_color = color.orange if self.mode_index == 1 else color.cyan
+            self.mode_label.text = mode_tag
+            self.mode_label.color = mode_color
+            self.mode_desc.text = m['description']
+            self.hs_label.text = f"HIGH SCORE: {self.hs_mgr.get_high_score(self.mode_index):,}   |   RUNS: {self.hs_mgr.runs_played}"
+
+        def toggle_mode():
+            self.mode_index = (self.mode_index + 1) % len(GAME_MODES)
+            update_mode_ui()
+            on_mode_change(self.mode_index)
+
+        self.mode_label = Text(
+            parent=self.menu_root,
+            text='[ MODE: CLASSIC ]',
+            origin=(0, 0),
+            position=(0, 0.11),
+            scale=1.4,
+            color=color.cyan
+        )
+        self.mode_desc = Text(
+            parent=self.menu_root,
+            text=GAME_MODES[self.mode_index]['description'],
+            origin=(0, 0),
+            position=(0, 0.05),
+            scale=0.95,
+            color=color.light_gray
+        )
+
+        Button(
+            parent=self.menu_root,
+            text='SWITCH MODE',
+            scale=(0.26, 0.05),
+            position=(0, -0.01),
+            color=color.dark_gray,
+            highlight_color=color.orange,
+            on_click=toggle_mode
         )
 
         # Skin selector info
@@ -128,8 +185,8 @@ class UIManager:
             parent=self.menu_root,
             text=f'[ SHIP: {skin_name} ]',
             origin=(0, 0),
-            position=(0, 0.04),
-            scale=1.3,
+            position=(0, -0.09),
+            scale=1.2,
             color=color.lime
         )
 
@@ -146,8 +203,8 @@ class UIManager:
         Button(
             parent=self.menu_root,
             text='PREV',
-            scale=(0.14, 0.06),
-            position=(-0.25, 0.04),
+            scale=(0.12, 0.05),
+            position=(-0.24, -0.09),
             color=color.dark_gray,
             highlight_color=color.azure,
             on_click=prev_skin
@@ -155,22 +212,22 @@ class UIManager:
         Button(
             parent=self.menu_root,
             text='NEXT',
-            scale=(0.14, 0.06),
-            position=(0.25, 0.04),
+            scale=(0.12, 0.05),
+            position=(0.24, -0.09),
             color=color.dark_gray,
             highlight_color=color.azure,
             on_click=next_skin
         )
 
         # Controls info
-        controls_str = "CONTROLS:\n [A] / [D] or [Left] / [Right] : Shift Lanes\n [W] / [Space] / [Up] : Jump Laser Hurdles\n [S] / [Down] : Slide Under High Barriers\n [E] / [Shift] : Hyper-Boost"
+        controls_str = "CONTROLS: [A]/[D] Shift Lanes | [W]/[Space] Jump | [S] Slide | [E] Hyper-Boost"
         Text(
             parent=self.menu_root,
             text=controls_str,
             origin=(0, 0),
-            position=(0, -0.15),
-            scale=1.0,
-            color=color.light_gray
+            position=(0, -0.19),
+            scale=0.95,
+            color=color.gray
         )
 
         # Launch Button
@@ -178,15 +235,16 @@ class UIManager:
             parent=self.menu_root,
             text='[ LAUNCH MISSION ]',
             scale=(0.35, 0.08),
-            position=(0, -0.32),
+            position=(0, -0.31),
             color=color.azure,
             highlight_color=color.cyan,
             on_click=on_start
         )
 
-    def show_game_over(self, score, distance, coins, is_new_high, on_restart, on_menu):
+    def show_game_over(self, score, distance, coins, mode_index, is_new_high, on_restart, on_menu):
         self.hide_all()
         self.gameover_root = Entity(parent=camera.ui)
+        mode_name = GAME_MODES[mode_index]['name']
 
         Text(
             parent=self.gameover_root,
@@ -200,20 +258,26 @@ class UIManager:
         if is_new_high:
             Text(
                 parent=self.gameover_root,
-                text='* NEW ALL-TIME RECORD! *',
+                text=f'* NEW {mode_name} RECORD! *',
                 origin=(0, 0),
                 position=(0, 0.23),
                 scale=1.4,
                 color=color.yellow
             )
 
-        summary_text = f"FINAL SCORE:  {int(score):,}\n\nDISTANCE:     {int(distance):,} m\nENERGY SHARDS: {coins}\nBEST RECORD:  {self.hs_mgr.high_score:,}"
+        summary_text = (
+            f"MODE:          {mode_name}\n"
+            f"FINAL SCORE:   {int(score):,}\n\n"
+            f"DISTANCE:      {int(distance):,} m\n"
+            f"ENERGY SHARDS: {coins}\n"
+            f"BEST RECORD:   {self.hs_mgr.get_high_score(mode_index):,}"
+        )
         Text(
             parent=self.gameover_root,
             text=summary_text,
             origin=(0, 0),
-            position=(0, 0.06),
-            scale=1.25,
+            position=(0, 0.05),
+            scale=1.2,
             color=color.white
         )
 
@@ -221,7 +285,7 @@ class UIManager:
             parent=self.gameover_root,
             text='[ RETRY - SPACE ]',
             scale=(0.28, 0.07),
-            position=(-0.16, -0.22),
+            position=(-0.16, -0.23),
             color=color.azure,
             highlight_color=color.cyan,
             on_click=on_restart
@@ -230,7 +294,7 @@ class UIManager:
             parent=self.gameover_root,
             text='[ MAIN MENU ]',
             scale=(0.28, 0.07),
-            position=(0.16, -0.22),
+            position=(0.16, -0.23),
             color=color.dark_gray,
             highlight_color=color.magenta,
             on_click=on_menu

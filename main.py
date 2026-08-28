@@ -15,11 +15,9 @@ from ursina import (
 from ursina import time as ursina_time
 
 from game.config import (
-    WINDOW_TITLE, TARGET_FPS, INITIAL_SPEED, MAX_SPEED,
-    SPEED_ACCELERATION, BOOST_SPEED_MULTIPLIER,
+    WINDOW_TITLE, TARGET_FPS,
     POINTS_PER_METER, COIN_POINTS, COMBO_TIMEOUT,
-    BOOST_DURATION, MAGNET_DURATION, SHIELD_DURATION,
-    BIOMES, SHIP_SKINS
+    BIOMES, SHIP_SKINS, GAME_MODES, MODE_CLASSIC, MODE_OVERDRIVE
 )
 from game.audio_synth import SoundManager
 from game.highscores import HighScoreManager
@@ -70,10 +68,11 @@ class CyberSurgeGame:
         self.player = None
         self.state = STATE_MENU
         self.current_skin_index = 0
+        self.current_mode_index = 0
 
         # Gameplay metrics
-        self.speed = INITIAL_SPEED
-        self.base_speed = INITIAL_SPEED
+        self.speed = GAME_MODES[0]['initial_speed']
+        self.base_speed = GAME_MODES[0]['initial_speed']
         self.distance = 0.0
         self.score = 0.0
         self.coins_collected = 0
@@ -111,7 +110,8 @@ class CyberSurgeGame:
 
         self.ui_mgr.show_menu(
             on_start=self.start_game,
-            on_skin_change=self.on_change_skin
+            on_skin_change=self.on_change_skin,
+            on_mode_change=self.on_change_mode
         )
 
     def on_change_skin(self, skin_idx):
@@ -119,17 +119,22 @@ class CyberSurgeGame:
         if self.player:
             self.player.change_skin(skin_idx)
 
+    def on_change_mode(self, mode_idx):
+        self.current_mode_index = mode_idx
+
     def start_game(self):
-        self.ui_mgr.hide_all()  # Hide title screen & menus immediately
+        self.ui_mgr.hide_all()
         self.state = STATE_PLAYING
-        self.speed = INITIAL_SPEED
-        self.base_speed = INITIAL_SPEED
+
+        mode_cfg = GAME_MODES[self.current_mode_index]
+        self.speed = mode_cfg['initial_speed']
+        self.base_speed = mode_cfg['initial_speed']
         self.distance = 0.0
         self.score = 0.0
         self.coins_collected = 0
         self.combo_multiplier = 1
         self.combo_timer = 0.0
-        self.invulnerable_timer = 1.8  # Starting grace period
+        self.invulnerable_timer = 1.8
 
         self.active_biome_index = 0
         self.apply_dark_theme(BIOMES[0])
@@ -145,7 +150,7 @@ class CyberSurgeGame:
         self.cam_shaker.base_pos = Vec3(0, 3.2, -7.5)
         self.cam_shaker.update(0)
 
-        self.ui_mgr.init_hud()
+        self.ui_mgr.init_hud(mode_index=self.current_mode_index)
         self.ui_mgr.show_hud(True)
         self.sounds.start_music()
 
@@ -171,6 +176,14 @@ class CyberSurgeGame:
         if self.state == STATE_MENU:
             if key in ('space', 'enter'):
                 self.start_game()
+            elif key in ('tab', 'm'):
+                self.current_mode_index = (self.current_mode_index + 1) % len(GAME_MODES)
+                self.ui_mgr.mode_index = self.current_mode_index
+                m = GAME_MODES[self.current_mode_index]
+                self.ui_mgr.mode_label.text = '[ MODE: OVERDRIVE 🔥 ]' if self.current_mode_index == 1 else '[ MODE: CLASSIC ]'
+                self.ui_mgr.mode_label.color = color.orange if self.current_mode_index == 1 else color.cyan
+                self.ui_mgr.mode_desc.text = m['description']
+                self.ui_mgr.hs_label.text = f"HIGH SCORE: {self.hs_mgr.get_high_score(self.current_mode_index):,}   |   RUNS: {self.hs_mgr.runs_played}"
             elif key in ('left arrow', 'a'):
                 self.current_skin_index = (self.current_skin_index - 1) % len(SHIP_SKINS)
                 self.ui_mgr.skin_index = self.current_skin_index
@@ -192,9 +205,10 @@ class CyberSurgeGame:
             elif key in ('s', 'down arrow'):
                 self.player.slide()
             elif key in ('e', 'left shift'):
-                if not self.player.is_boosting:
-                    self.player.activate_boost(BOOST_DURATION)
-                    self.cam_shaker.add_shake(0.4)
+                mode_cfg = GAME_MODES[self.current_mode_index]
+                stack = mode_cfg['stacking_powerups']
+                self.player.activate_boost(mode_cfg['boost_duration'], stack=stack)
+                self.cam_shaker.add_shake(0.4)
             elif key == 'escape':
                 self.toggle_pause()
 
@@ -214,11 +228,14 @@ class CyberSurgeGame:
         self.cam_shaker.add_shake(1.0)
         ParticleBurst(position=self.player.position, burst_color=color.red, count=16)
 
-        is_new_high = self.hs_mgr.record_run(self.score, self.distance, self.coins_collected)
+        is_new_high = self.hs_mgr.record_run(
+            self.score, self.distance, self.coins_collected, mode_index=self.current_mode_index
+        )
         self.ui_mgr.show_game_over(
             score=self.score,
             distance=self.distance,
             coins=self.coins_collected,
+            mode_index=self.current_mode_index,
             is_new_high=is_new_high,
             on_restart=self.start_game,
             on_menu=self.setup_menu
@@ -227,6 +244,7 @@ class CyberSurgeGame:
     def check_collisions(self):
         p = self.player
         p_pos = p.position
+        mode_cfg = GAME_MODES[self.current_mode_index]
 
         for h in self.track_mgr.get_nearby_hazards(p_pos.z, radius=6.0):
             if not h.enabled or not h.visible:
@@ -248,15 +266,22 @@ class CyberSurgeGame:
                     elif h.hazard_type == 'pylon':
                         self.trigger_hit(h)
 
-        for item in self.track_mgr.get_nearby_items(p_pos.z, radius=14.0):
+        base_magnet_range = 14.0
+        if p.has_magnet:
+            magnet_range = base_magnet_range + (p.magnet_stacks * 6.0 if mode_cfg['stacking_powerups'] else 0.0)
+        else:
+            magnet_range = base_magnet_range
+
+        for item in self.track_mgr.get_nearby_items(p_pos.z, radius=magnet_range + 2.0):
             if not item.enabled or not item.visible:
                 continue
 
             dist_vec = item.position - p_pos
             dist_sq = dist_vec.length()
 
-            if p.has_magnet and dist_sq < 14.0:
-                item.position -= dist_vec.normalized() * 24.0 * ursina_time.dt
+            if p.has_magnet and dist_sq < magnet_range:
+                pull_speed = 24.0 + (p.magnet_stacks * 8.0 if mode_cfg['stacking_powerups'] else 0.0)
+                item.position -= dist_vec.normalized() * pull_speed * ursina_time.dt
 
             if dist_sq < 1.8:
                 item.enabled = False
@@ -277,12 +302,16 @@ class CyberSurgeGame:
             return
 
         if self.player.has_shield:
-            self.player.has_shield = False
-            self.player.shield_bubble.enabled = False
-            self.invulnerable_timer = 1.8
+            charges_left = self.player.consume_shield_charge()
+            self.invulnerable_timer = 1.6
             self.cam_shaker.add_shake(0.5)
             ParticleBurst(position=self.player.position, burst_color=color.azure, count=14)
-            FloatingPopup('SHIELD DEFLECT!', position=self.player.position + Vec3(0, 1.2, 0), text_color=color.azure)
+            
+            if charges_left > 0:
+                FloatingPopup(f'SHIELD HIT! [{charges_left} REMAIN]', position=self.player.position + Vec3(0, 1.2, 0), text_color=color.azure)
+            else:
+                FloatingPopup('SHIELD BROKEN!', position=self.player.position + Vec3(0, 1.2, 0), text_color=color.orange)
+                
             hazard.enabled = False
             hazard.visible = False
             
@@ -294,30 +323,37 @@ class CyberSurgeGame:
         self.game_over()
 
     def handle_item_pickup(self, item):
+        mode_cfg = GAME_MODES[self.current_mode_index]
+        is_stack = mode_cfg['stacking_powerups']
         ParticleBurst(position=item.position, burst_color=item.color, count=6)
 
         if item.item_type == 'shard':
             self.coins_collected += 1
             self.score += COIN_POINTS * self.combo_multiplier
             self.combo_timer = COMBO_TIMEOUT
-            self.combo_multiplier = min(8, self.combo_multiplier + 1)
+            max_c = mode_cfg['max_combo']
+            self.combo_multiplier = min(max_c, self.combo_multiplier + 1)
             FloatingPopup(f'+{COIN_POINTS * self.combo_multiplier}', position=item.position, text_color=color.cyan)
 
         elif item.item_type == 'shield':
-            self.player.activate_shield(SHIELD_DURATION)
-            FloatingPopup('SHIELD MATRIX ACTIVE!', position=item.position, text_color=color.azure, scale=2.0)
+            self.player.activate_shield(mode_cfg['shield_duration'], stack=is_stack)
+            tag = f'SHIELD x{self.player.shield_charges}!' if is_stack and self.player.shield_charges > 1 else 'SHIELD MATRIX!'
+            FloatingPopup(tag, position=item.position, text_color=color.azure, scale=2.0)
 
         elif item.item_type == 'magnet':
-            self.player.activate_magnet(MAGNET_DURATION)
-            FloatingPopup('MAGNET FLUX ON!', position=item.position, text_color=color.yellow, scale=2.0)
+            self.player.activate_magnet(mode_cfg['magnet_duration'], stack=is_stack)
+            tag = f'MAGNET x{self.player.magnet_stacks}!' if is_stack and self.player.magnet_stacks > 1 else 'MAGNET FLUX!'
+            FloatingPopup(tag, position=item.position, text_color=color.yellow, scale=2.0)
 
         elif item.item_type == 'boost':
-            self.player.activate_boost(BOOST_DURATION)
+            self.player.activate_boost(mode_cfg['boost_duration'], stack=is_stack)
             self.cam_shaker.add_shake(0.4)
-            FloatingPopup('HYPERDRIVE ENGAGED!', position=item.position, text_color=color.orange, scale=2.2)
+            tag = f'HYPERDRIVE x{self.player.boost_stacks}!' if is_stack and self.player.boost_stacks > 1 else 'HYPERDRIVE ENGAGED!'
+            FloatingPopup(tag, position=item.position, text_color=color.orange, scale=2.2)
 
     def update(self):
         dt = ursina_time.dt
+        mode_cfg = GAME_MODES[self.current_mode_index]
 
         if self.state == STATE_PLAYING:
             if self.invulnerable_timer > 0:
@@ -333,10 +369,19 @@ class CyberSurgeGame:
                 if self.combo_timer <= 0:
                     self.combo_multiplier = 1
 
-            self.base_speed = min(MAX_SPEED, INITIAL_SPEED + (self.distance / 100.0) * SPEED_ACCELERATION)
+            # Mode-specific acceleration & max speed
+            accel_rate = mode_cfg['speed_acceleration']
+            max_spd = mode_cfg['max_speed']
+            self.base_speed = min(max_spd, mode_cfg['initial_speed'] + (self.distance / 100.0) * accel_rate)
+            
             if self.player.is_boosting:
-                self.speed = self.base_speed * BOOST_SPEED_MULTIPLIER
-                self.target_fov = 82
+                if mode_cfg['stacking_powerups']:
+                    boost_mult = mode_cfg['boost_multiplier'] + (self.player.boost_stacks - 1) * 0.25
+                    self.target_fov = min(96, 82 + (self.player.boost_stacks - 1) * 5)
+                else:
+                    boost_mult = mode_cfg['boost_multiplier']
+                    self.target_fov = 82
+                self.speed = self.base_speed * boost_mult
             else:
                 self.speed = self.base_speed
                 self.target_fov = 68
@@ -363,23 +408,26 @@ class CyberSurgeGame:
             )
             self.cam_shaker.update(dt)
 
-            # Apply dark theme only when biome index changes
             if self.track_mgr.current_biome_index != self.active_biome_index:
                 self.active_biome_index = self.track_mgr.current_biome_index
                 curr_biome = self.track_mgr.get_current_biome()
                 self.apply_dark_theme(curr_biome)
 
+            # Update HUD status with stacking charges
             powerup_msg = ''
             if self.player.is_boosting:
-                powerup_msg += f'⚡ HYPERDRIVE [{self.player.boost_timer:.1f}s]  '
+                stack_str = f' x{self.player.boost_stacks}' if self.player.boost_stacks > 1 else ''
+                powerup_msg += f'⚡ HYPERDRIVE{stack_str} [{self.player.boost_timer:.1f}s]  '
             if self.player.has_shield:
-                powerup_msg += f'🛡️ SHIELD [{self.player.shield_timer:.1f}s]  '
+                stack_str = f' x{self.player.shield_charges}' if self.player.shield_charges > 1 else ''
+                powerup_msg += f'🛡️ SHIELD{stack_str} [{self.player.shield_timer:.1f}s]  '
             if self.player.has_magnet:
-                powerup_msg += f'🧲 MAGNET [{self.player.magnet_timer:.1f}s]'
+                stack_str = f' x{self.player.magnet_stacks}' if self.player.magnet_stacks > 1 else ''
+                powerup_msg += f'🧲 MAGNET{stack_str} [{self.player.magnet_timer:.1f}s]'
 
             self.ui_mgr.update_hud(
                 score=self.score,
-                high_score=max(self.score, self.hs_mgr.high_score),
+                high_score=max(self.score, self.hs_mgr.get_high_score(self.current_mode_index)),
                 multiplier=self.combo_multiplier,
                 speed=self.speed,
                 powerup_msg=powerup_msg

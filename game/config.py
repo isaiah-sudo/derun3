@@ -13,13 +13,40 @@ SEGMENT_LENGTH = 24
 SEGMENTS_AHEAD = 14
 SEGMENT_TOTAL = SEGMENTS_AHEAD + 3
 
-INITIAL_SPEED = 34.0
-MAX_SPEED = 85.0
-SPEED_ACCELERATION = 0.55
-BOOST_SPEED_MULTIPLIER = 1.6
-BOOST_DURATION = 5.0
-MAGNET_DURATION = 8.0
-SHIELD_DURATION = 15.0
+# Game Modes
+MODE_CLASSIC = 0
+MODE_OVERDRIVE = 1
+
+GAME_MODES = [
+    {
+        'name': 'CLASSIC',
+        'tag': 'CRUISE',
+        'initial_speed': 34.0,
+        'max_speed': 85.0,
+        'speed_acceleration': 0.55,
+        'boost_multiplier': 1.6,
+        'boost_duration': 5.0,
+        'magnet_duration': 8.0,
+        'shield_duration': 15.0,
+        'max_combo': 8,
+        'stacking_powerups': False,
+        'description': 'Balanced speed acceleration and standard powerup timers.'
+    },
+    {
+        'name': 'OVERDRIVE',
+        'tag': 'HYPER-SURGE',
+        'initial_speed': 42.0,
+        'max_speed': 175.0,
+        'speed_acceleration': 2.40,
+        'boost_multiplier': 1.75,
+        'boost_duration': 5.5,
+        'magnet_duration': 9.0,
+        'shield_duration': 16.0,
+        'max_combo': 32,
+        'stacking_powerups': True,
+        'description': 'Ultra-fast speed growth! Powerups stack in count, duration, and power!'
+    }
+]
 
 # Player Movement
 JUMP_FORCE = 15.0
