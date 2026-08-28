@@ -36,19 +36,23 @@ class FloatingPopup(Entity):
             scale=scale,
             billboard=True
         )
-        self.lifetime = 1.0
+        self.lifetime = 0.8
         self.elapsed = 0.0
 
     def update(self):
-        self.y += 3.0 * time.dt
+        self.y += 3.5 * time.dt
         self.elapsed += time.dt
         alpha = max(0.0, 1.0 - (self.elapsed / self.lifetime))
-        self.text_entity.alpha = alpha
+        if self.text_entity:
+            self.text_entity.alpha = alpha
         if self.elapsed >= self.lifetime:
+            if self.text_entity:
+                destroy(self.text_entity)
+                self.text_entity = None
             destroy(self)
 
 class ParticleBurst(Entity):
-    def __init__(self, position, burst_color=color.cyan, count=14):
+    def __init__(self, position, burst_color=color.cyan, count=10):
         super().__init__(position=position)
         self.particles = []
         for _ in range(count):
@@ -56,7 +60,7 @@ class ParticleBurst(Entity):
                 parent=self,
                 model='cube',
                 color=burst_color,
-                scale=0.15,
+                scale=0.18,
                 position=(0, 0.5, 0)
             )
             vel = Vec3(
@@ -65,13 +69,18 @@ class ParticleBurst(Entity):
                 (random.random() - 0.5) * 8.0
             )
             self.particles.append((p, vel))
-        self.lifetime = 0.6
+        self.lifetime = 0.5
         self.elapsed = 0.0
 
     def update(self):
         self.elapsed += time.dt
         for p, vel in self.particles:
-            p.position += vel * time.dt
-            p.scale *= max(0.0, 1.0 - 1.8 * time.dt)
+            if p:
+                p.position += vel * time.dt
+                p.scale *= max(0.0, 1.0 - 2.0 * time.dt)
         if self.elapsed >= self.lifetime:
+            for p, _ in self.particles:
+                if p:
+                    destroy(p)
+            self.particles.clear()
             destroy(self)

@@ -50,6 +50,7 @@ class CyberSurgeGame:
         global_clock.setFrameRate(60.0)
 
         # Enforce Dark Theme 3D Viewport Clear Background
+        self.active_biome_index = 0
         self.apply_dark_theme(BIOMES[0])
 
         window.fps_counter.enabled = True
@@ -130,6 +131,9 @@ class CyberSurgeGame:
         self.combo_timer = 0.0
         self.invulnerable_timer = 1.8  # Starting grace period
 
+        self.active_biome_index = 0
+        self.apply_dark_theme(BIOMES[0])
+
         self.track_mgr.init_track()
         if self.player:
             destroy_entity_tree(self.player)
@@ -208,7 +212,7 @@ class CyberSurgeGame:
         self.state = STATE_GAMEOVER
         self.sounds.stop_music()
         self.cam_shaker.add_shake(1.0)
-        ParticleBurst(position=self.player.position, burst_color=color.red, count=20)
+        ParticleBurst(position=self.player.position, burst_color=color.red, count=16)
 
         is_new_high = self.hs_mgr.record_run(self.score, self.distance, self.coins_collected)
         self.ui_mgr.show_game_over(
@@ -265,7 +269,7 @@ class CyberSurgeGame:
 
         if self.player.is_boosting:
             self.cam_shaker.add_shake(0.35)
-            ParticleBurst(position=hazard.position, burst_color=color.orange, count=14)
+            ParticleBurst(position=hazard.position, burst_color=color.orange, count=12)
             FloatingPopup('+200 SMASH!', position=hazard.position + Vec3(0, 1, 0), text_color=color.orange)
             self.score += 200 * self.combo_multiplier
             hazard.enabled = False
@@ -277,7 +281,7 @@ class CyberSurgeGame:
             self.player.shield_bubble.enabled = False
             self.invulnerable_timer = 1.8
             self.cam_shaker.add_shake(0.5)
-            ParticleBurst(position=self.player.position, burst_color=color.azure, count=16)
+            ParticleBurst(position=self.player.position, burst_color=color.azure, count=14)
             FloatingPopup('SHIELD DEFLECT!', position=self.player.position + Vec3(0, 1.2, 0), text_color=color.azure)
             hazard.enabled = False
             hazard.visible = False
@@ -290,7 +294,7 @@ class CyberSurgeGame:
         self.game_over()
 
     def handle_item_pickup(self, item):
-        ParticleBurst(position=item.position, burst_color=item.color, count=8)
+        ParticleBurst(position=item.position, burst_color=item.color, count=6)
 
         if item.item_type == 'shard':
             self.coins_collected += 1
@@ -359,9 +363,11 @@ class CyberSurgeGame:
             )
             self.cam_shaker.update(dt)
 
-            # Apply dark theme viewport clear
-            curr_biome = self.track_mgr.get_current_biome()
-            self.apply_dark_theme(curr_biome)
+            # Apply dark theme only when biome index changes
+            if self.track_mgr.current_biome_index != self.active_biome_index:
+                self.active_biome_index = self.track_mgr.current_biome_index
+                curr_biome = self.track_mgr.get_current_biome()
+                self.apply_dark_theme(curr_biome)
 
             powerup_msg = ''
             if self.player.is_boosting:
