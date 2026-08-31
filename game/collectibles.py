@@ -1,4 +1,4 @@
-﻿import random
+import random
 import math
 import time
 from ursina import Entity, color, Vec3, destroy
@@ -32,7 +32,20 @@ class Collectible(Entity):
             self.color = color.orange
             self.scale = (0.6, 1.2, 0.6)
             self.core = Entity(parent=self, model='sphere', color=color.yellow, scale=0.7)
+        elif item_type == 'emp':
+            self.model = 'sphere'
+            self.color = color.hex('#ff00aa')
+            self.scale = 1.1
+            self.ring = Entity(parent=self, model='quad', color=color.hex('#00ffee'), scale=1.8, double_sided=True)
+            self.ring.rotation_x = 90
+            self.core = Entity(parent=self, model='sphere', color=color.white, scale=0.5)
+        elif item_type == 'ammo':
+            self.model = 'cube'
+            self.color = color.hex('#00ffee')
+            self.scale = (0.5, 0.9, 0.5)
+            self.core = Entity(parent=self, model='cube', color=color.hex('#ff0055'), scale=(0.7, 0.3, 0.7), position=(0, 0, 0))
 
     def update(self):
-        self.rotation_y += 180.0 * ursina_time.dt
+        dt = min(ursina_time.dt, 0.05)
+        self.rotation_y += 180.0 * dt
         self.y = self.base_y + 0.2 * math.sin(time.time() * 4.0 + self.hover_offset)

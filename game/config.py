@@ -1,4 +1,4 @@
-﻿# Game configuration, constants, and palettes
+# Game configuration, constants, and palettes
 from ursina import color, Vec3, Vec4
 
 WINDOW_TITLE = 'CYBERSURGE 3D // SYNTHWAVE RUNNER'
@@ -10,8 +10,9 @@ NUM_LANES = 3  # -1 (Left), 0 (Center), 1 (Right)
 LANE_POSITIONS = [-LANE_WIDTH, 0, LANE_WIDTH]
 
 SEGMENT_LENGTH = 24
-SEGMENTS_AHEAD = 14
+SEGMENTS_AHEAD = 10
 SEGMENT_TOTAL = SEGMENTS_AHEAD + 3
+MAX_DELTA_TIME = 0.05
 
 # Game Modes
 MODE_CLASSIC = 0
@@ -103,10 +104,32 @@ BIOMES = [
     }
 ]
 
-# Ship Skins
+# Ship Skins - 8 Unique Cyber Vessels
 SHIP_SKINS = [
     {'name': 'NEON BLADE', 'primary': color.cyan, 'secondary': color.magenta, 'trail': color.cyan},
     {'name': 'SOLAR PHANTOM', 'primary': color.orange, 'secondary': color.yellow, 'trail': color.orange},
     {'name': 'TOXIC VIPER', 'primary': color.lime, 'secondary': color.azure, 'trail': color.lime},
     {'name': 'DARK MATTER', 'primary': color.violet, 'secondary': color.red, 'trail': color.violet},
+    {'name': 'HYPERION PHOENIX', 'primary': color.hex('#ff2a2a'), 'secondary': color.hex('#ffd700'), 'trail': color.hex('#ff5500')},
+    {'name': 'VOID SPECTRE', 'primary': color.hex('#00ffea'), 'secondary': color.hex('#202028'), 'trail': color.hex('#00ffee')},
+    {'name': 'GLITCH RUNNER', 'primary': color.hex('#ff007f'), 'secondary': color.white, 'trail': color.hex('#ff00aa')},
+    {'name': 'QUANTUM PULSE', 'primary': color.hex('#00ffa2'), 'secondary': color.hex('#9400d3'), 'trail': color.hex('#7df9ff')},
+]
+
+# Laser Combat, Ammo & Ramp Mechanics
+LASER_COOLDOWN = 0.28
+LASER_SPEED = 140.0
+INITIAL_AMMO = 0
+AMMO_PICKUP_AMOUNT = 5
+MAX_AMMO = 99
+RAMP_LAUNCH_FORCE = 24.0
+SPEED_PAD_BOOST_TIME = 2.0
+
+# Achievements / Missions
+ACHIEVEMENTS = [
+    {'id': 'speed_100', 'name': 'SPEED DEMON', 'desc': 'Exceed 100 KM/H in any run', 'target': 100},
+    {'id': 'shards_50', 'name': 'SHARD HOARDER', 'desc': 'Collect 50 energy shards in one run', 'target': 50},
+    {'id': 'destructions_15', 'name': 'ANNIHILATOR', 'desc': 'Destroy 15 hazards with Laser Cannons', 'target': 15},
+    {'id': 'combo_8', 'name': 'COMBO MASTER', 'desc': 'Attain an 8x combo multiplier', 'target': 8},
+    {'id': 'ramps_5', 'name': 'AERIAL ACE', 'desc': 'Hit 5 neon jump ramps in one run', 'target': 5},
 ]

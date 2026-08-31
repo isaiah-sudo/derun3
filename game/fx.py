@@ -1,4 +1,4 @@
-﻿import random
+import random
 from ursina import Entity, Text, color, Vec3, destroy, time
 
 class CameraShake:
@@ -36,12 +36,13 @@ class FloatingPopup(Entity):
             scale=scale,
             billboard=True
         )
-        self.lifetime = 0.8
+        self.lifetime = 0.65
         self.elapsed = 0.0
 
     def update(self):
-        self.y += 3.5 * time.dt
-        self.elapsed += time.dt
+        dt = min(time.dt, 0.05)
+        self.y += 3.5 * dt
+        self.elapsed += dt
         alpha = max(0.0, 1.0 - (self.elapsed / self.lifetime))
         if self.text_entity:
             self.text_entity.alpha = alpha
@@ -52,7 +53,7 @@ class FloatingPopup(Entity):
             destroy(self)
 
 class ParticleBurst(Entity):
-    def __init__(self, position, burst_color=color.cyan, count=10):
+    def __init__(self, position, burst_color=color.cyan, count=6):
         super().__init__(position=position)
         self.particles = []
         for _ in range(count):
@@ -69,15 +70,16 @@ class ParticleBurst(Entity):
                 (random.random() - 0.5) * 8.0
             )
             self.particles.append((p, vel))
-        self.lifetime = 0.5
+        self.lifetime = 0.4
         self.elapsed = 0.0
 
     def update(self):
-        self.elapsed += time.dt
+        dt = min(time.dt, 0.05)
+        self.elapsed += dt
         for p, vel in self.particles:
             if p:
-                p.position += vel * time.dt
-                p.scale *= max(0.0, 1.0 - 2.0 * time.dt)
+                p.position += vel * dt
+                p.scale *= max(0.0, 1.0 - 2.5 * dt)
         if self.elapsed >= self.lifetime:
             for p, _ in self.particles:
                 if p:

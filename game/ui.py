@@ -1,4 +1,4 @@
-﻿from ursina import Entity, Text, Button, color, camera, Vec2, Vec3, destroy
+from ursina import Entity, Text, Button, color, camera, Vec2, Vec3, destroy
 from game.config import SHIP_SKINS, GAME_MODES
 
 def destroy_entity_tree(entity):
@@ -85,21 +85,100 @@ class UIManager:
             color=color.orange
         )
 
-    def update_hud(self, score, high_score, multiplier, speed, powerup_msg):
+        # Bottom Left: Laser Blaster Ready indicator
+        self.laser_text = Text(
+            parent=self.hud_root,
+            text='[F] LASER: READY',
+            position=(-0.82, -0.42),
+            scale=1.0,
+            color=color.hex('#00ffee')
+        )
+
+        # Achievement Unlock Banner Popup
+        self.ach_banner = Entity(parent=self.hud_root, enabled=False)
+        self.ach_title = Text(
+            parent=self.ach_banner,
+            text='* MISSION ACCOMPLISHED *',
+            origin=(0, 0),
+            position=(0, 0.36),
+            scale=1.3,
+            color=color.yellow
+        )
+        self.ach_desc = Text(
+            parent=self.ach_banner,
+            text='',
+            origin=(0, 0),
+            position=(0, 0.31),
+            scale=1.0,
+            color=color.cyan
+        )
+        self.ach_timer = 0.0
+
+        # Cache variables
+        self._cached_score_int = -1
+        self._cached_hs_int = -1
+        self._cached_multiplier = -1
+        self._cached_speed_int = -1
+        self._cached_powerup_msg = None
+        self._cached_laser_ammo = -1
+        self._cached_laser_ready = True
+
+    def show_achievement_banner(self, ach):
+        if not self.hud_root:
+            return
+        self.ach_banner.enabled = True
+        self.ach_desc.text = f"{ach['name']} - {ach['desc']}"
+        self.ach_timer = 3.5
+
+    def update_hud(self, score, high_score, multiplier, speed, powerup_msg, ammo=0, laser_ready=True, dt=0.016):
         if not self.hud_root or not self.hud_root.enabled:
             return
-        self.score_text.text = f'SCORE: {int(score):,}'
-        self.high_score_text.text = f'BEST: {int(high_score):,}'
-        if multiplier > 1:
-            self.multiplier_text.text = f'COMBO: x{multiplier} !'
-            self.multiplier_text.color = color.orange
-        else:
-            self.multiplier_text.text = 'COMBO: x1'
-            self.multiplier_text.color = color.yellow
 
-        display_speed = int(speed * 3.6)
-        self.speed_text.text = f'SPEED: {display_speed} KM/H'
-        self.powerup_text.text = powerup_msg
+        if self.ach_timer > 0:
+            self.ach_timer -= dt
+            if self.ach_timer <= 0:
+                self.ach_banner.enabled = False
+
+        s_int = int(score)
+        if s_int != self._cached_score_int:
+            self._cached_score_int = s_int
+            self.score_text.text = f'SCORE: {s_int:,}'
+
+        hs_int = int(high_score)
+        if hs_int != self._cached_hs_int:
+            self._cached_hs_int = hs_int
+            self.high_score_text.text = f'BEST: {hs_int:,}'
+
+        if multiplier != self._cached_multiplier:
+            self._cached_multiplier = multiplier
+            if multiplier > 1:
+                self.multiplier_text.text = f'COMBO: x{multiplier} !'
+                self.multiplier_text.color = color.orange
+            else:
+                self.multiplier_text.text = 'COMBO: x1'
+                self.multiplier_text.color = color.yellow
+
+        spd_int = int(speed * 3.6)
+        if spd_int != self._cached_speed_int:
+            self._cached_speed_int = spd_int
+            self.speed_text.text = f'SPEED: {spd_int} KM/H'
+
+        if powerup_msg != self._cached_powerup_msg:
+            self._cached_powerup_msg = powerup_msg
+            self.powerup_text.text = powerup_msg
+
+        if ammo != self._cached_laser_ammo or laser_ready != self._cached_laser_ready:
+            self._cached_laser_ammo = ammo
+            self._cached_laser_ready = laser_ready
+            if ammo <= 0:
+                self.laser_text.text = '[F / CLICK] LASERS: NO AMMO [FIND CELLS]'
+                self.laser_text.color = color.hex('#ff4466')
+            elif laser_ready:
+                self.laser_text.text = f'[F / CLICK] LASERS: READY [AMMO: {ammo}]'
+                self.laser_text.color = color.hex('#00ffee')
+            else:
+                self.laser_text.text = f'[F / CLICK] LASERS: CHARGING [AMMO: {ammo}]'
+                self.laser_text.color = color.hex('#8899aa')
 
     def show_hud(self, show=True):
         if self.hud_root:
@@ -220,14 +299,14 @@ class UIManager:
         )
 
         # Controls info
-        controls_str = "CONTROLS: [A]/[D] Shift Lanes | [W]/[Space] Jump | [S] Slide | [E] Hyper-Boost"
+        controls_str = "CONTROLS: [A]/[D] Steer | [W]/[Space] Jump | [S] Slide | [F/Click] Fire Lasers | [E] Hyper-Boost"
         Text(
             parent=self.menu_root,
             text=controls_str,
             origin=(0, 0),
             position=(0, -0.19),
             scale=0.95,
-            color=color.gray
+            color=color.cyan
         )
 
         # Launch Button

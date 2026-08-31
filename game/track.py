@@ -1,9 +1,9 @@
-﻿import random
+import random
 from ursina import Entity, color, Vec3, destroy
 from game.config import (
     SEGMENT_LENGTH, SEGMENTS_AHEAD, LANE_POSITIONS, BIOMES
 )
-from game.obstacles import LaserHurdle, HighBarrier, DroneHazard, PylonHazard
+from game.obstacles import LaserHurdle, HighBarrier, DroneHazard, PylonHazard, JumpRamp, SpeedPad
 from game.collectibles import Collectible
 
 def destroy_entity_tree(entity):
@@ -20,6 +20,7 @@ class TrackSegment(Entity):
         self.is_safe = is_safe
         self.hazards = []
         self.items = []
+        self.features = []
 
         self.build_segment()
 
@@ -69,7 +70,7 @@ class TrackSegment(Entity):
             Entity(parent=self, model='cube', color=b['accent_color'], scale=(0.4, 5.0, 0.4), position=(5.5, 2.5, arch_z))
             Entity(parent=self, model='cube', color=b['rail_color'], scale=(11.4, 0.4, 0.4), position=(0, 5.0, arch_z))
 
-        # 5. Background Floating Cyber Skyscrapers (Dark Obsidian monoliths)
+        # 5. Background Floating Cyber Skyscrapers
         building_dark = color.hex('#0b0914')
         for _ in range(2):
             side = -1 if random.random() < 0.5 else 1
@@ -84,7 +85,6 @@ class TrackSegment(Entity):
                 scale=(width, height, width),
                 position=(dist_x, height / 2 - 8, dist_z)
             )
-            # Glowing neon accent band on skyscraper
             Entity(
                 parent=building,
                 model='cube',
@@ -93,10 +93,7 @@ class TrackSegment(Entity):
                 position=(0, 0.2, 0)
             )
 
-        # Combine all static pieces into 1 single efficient mesh with vertex colors
-        self.combine(auto_destroy=True)
-
-        # 6. Spawn Obstacles & Collectibles
+        # 6. Spawn Obstacles, Features & Collectibles
         if not self.is_safe:
             self.spawn_content()
 
@@ -105,7 +102,8 @@ class TrackSegment(Entity):
         available_lanes = [0, 1, 2]
         pattern_type = random.random()
 
-        if pattern_type < 0.40:
+        # Pattern A: Standard single lane hazard
+        if pattern_type < 0.30:
             hazard_lane = random.choice(available_lanes)
             hz_pos = Vec3(LANE_POSITIONS[hazard_lane], 0, self.z + SEGMENT_LENGTH * 0.5)
             h_type = random.choice(['hurdle', 'high', 'pylon'])
@@ -123,7 +121,8 @@ class TrackSegment(Entity):
                         c_pos = Vec3(LANE_POSITIONS[l_idx], 0.7, self.z + SEGMENT_LENGTH * 0.3 + k * 2.5)
                         self.items.append(Collectible(item_type='shard', position=c_pos))
 
-        elif pattern_type < 0.70:
+        # Pattern B: Double blocked lane with powerup
+        elif pattern_type < 0.55:
             clear_lane = random.choice(available_lanes)
             blocked_lanes = [l for l in available_lanes if l != clear_lane]
             
@@ -138,16 +137,54 @@ class TrackSegment(Entity):
 
             pickup_roll = random.random()
             item_kind = 'shard'
-            if pickup_roll < 0.15:
-                item_kind = 'shield'
+            if pickup_roll < 0.18:
+                item_kind = 'ammo'
             elif pickup_roll < 0.28:
+                item_kind = 'shield'
+            elif pickup_roll < 0.36:
                 item_kind = 'magnet'
-            elif pickup_roll < 0.38:
+            elif pickup_roll < 0.44:
                 item_kind = 'boost'
+            elif pickup_roll < 0.50:
+                item_kind = 'emp'
             c_pos = Vec3(LANE_POSITIONS[clear_lane], 0.7, self.z + SEGMENT_LENGTH * 0.5)
             self.items.append(Collectible(item_type=item_kind, position=c_pos))
 
-        elif pattern_type < 0.88:
+        # Pattern C: Neon Jump Ramp Launch over High Wall with Airborne Shards
+        elif pattern_type < 0.70:
+            ramp_lane = random.choice(available_lanes)
+            r_pos = Vec3(LANE_POSITIONS[ramp_lane], 0, self.z + SEGMENT_LENGTH * 0.25)
+            ramp = JumpRamp(position=r_pos)
+            self.features.append(ramp)
+
+            # Barrier behind the ramp that player soars over
+            wall_pos = Vec3(LANE_POSITIONS[ramp_lane], 0, self.z + SEGMENT_LENGTH * 0.6)
+            self.hazards.append(LaserHurdle(position=wall_pos))
+
+            # Airborne arc of shards
+            for k in range(3):
+                arc_y = 2.4 + k * 0.6
+                c_pos = Vec3(LANE_POSITIONS[ramp_lane], arc_y, self.z + SEGMENT_LENGTH * 0.45 + k * 2.0)
+                self.items.append(Collectible(item_type='shard', position=c_pos))
+
+        # Pattern D: Turbo Speed Pad Lane
+        elif pattern_type < 0.82:
+            pad_lane = random.choice(available_lanes)
+            sp_pos = Vec3(LANE_POSITIONS[pad_lane], 0, self.z + SEGMENT_LENGTH * 0.3)
+            sp = SpeedPad(position=sp_pos)
+            self.features.append(sp)
+
+            other_lanes = [l for l in available_lanes if l != pad_lane]
+            hz_lane = random.choice(other_lanes)
+            hz_pos = Vec3(LANE_POSITIONS[hz_lane], 0, self.z + SEGMENT_LENGTH * 0.5)
+            self.hazards.append(PylonHazard(position=hz_pos))
+
+            for k in range(3):
+                c_pos = Vec3(LANE_POSITIONS[pad_lane], 0.7, self.z + SEGMENT_LENGTH * 0.5 + k * 2.5)
+                self.items.append(Collectible(item_type='shard', position=c_pos))
+
+        # Pattern E: Moving Drone Hazard
+        elif pattern_type < 0.92:
             drone_pos = Vec3(0, 0, self.z + SEGMENT_LENGTH * 0.5)
             d = DroneHazard(position=drone_pos, speed=random.uniform(2.6, 3.8))
             self.hazards.append(d)
@@ -155,6 +192,7 @@ class TrackSegment(Entity):
                 c_pos = Vec3(LANE_POSITIONS[l_idx], 0.7, self.z + SEGMENT_LENGTH * 0.7)
                 self.items.append(Collectible(item_type='shard', position=c_pos))
 
+        # Pattern F: Shard Goldmine
         else:
             for l_idx in available_lanes:
                 for k in range(3):
@@ -166,9 +204,12 @@ class TrackSegment(Entity):
             destroy_entity_tree(h)
         for itm in self.items:
             destroy_entity_tree(itm)
+        for feat in self.features:
+            destroy_entity_tree(feat)
         self.hazards.clear()
         self.items.clear()
-        destroy(self)
+        self.features.clear()
+        destroy_entity_tree(self)
 
 
 class TrackManager:
@@ -192,7 +233,7 @@ class TrackManager:
         self.clear()
         self.next_z = -SEGMENT_LENGTH
         for i in range(SEGMENTS_AHEAD):
-            is_safe = (i < 4)
+            is_safe = (i < 3)
             seg = TrackSegment(z_pos=self.next_z, biome=self.get_current_biome(), is_safe=is_safe)
             self.segments.append(seg)
             self.next_z += SEGMENT_LENGTH
@@ -215,19 +256,31 @@ class TrackManager:
 
     def get_nearby_hazards(self, player_z, radius=10.0):
         nearby = []
+        threshold = radius + SEGMENT_LENGTH
         for seg in self.segments:
-            if abs(seg.z + SEGMENT_LENGTH * 0.5 - player_z) < radius + SEGMENT_LENGTH:
+            if abs(seg.z + SEGMENT_LENGTH * 0.5 - player_z) < threshold:
                 for h in seg.hazards:
-                    if h.enabled and h.visible and abs(h.z - player_z) < radius:
+                    if h.enabled and h.visible and abs(h.z - player_z) <= radius:
                         nearby.append(h)
+        return nearby
+
+    def get_nearby_features(self, player_z, radius=10.0):
+        nearby = []
+        threshold = radius + SEGMENT_LENGTH
+        for seg in self.segments:
+            if abs(seg.z + SEGMENT_LENGTH * 0.5 - player_z) < threshold:
+                for f in seg.features:
+                    if f.enabled and f.visible and abs(f.z - player_z) <= radius:
+                        nearby.append(f)
         return nearby
 
     def get_nearby_items(self, player_z, radius=16.0):
         nearby = []
+        threshold = radius + SEGMENT_LENGTH
         for seg in self.segments:
-            if abs(seg.z + SEGMENT_LENGTH * 0.5 - player_z) < radius + SEGMENT_LENGTH:
+            if abs(seg.z + SEGMENT_LENGTH * 0.5 - player_z) < threshold:
                 for item in seg.items:
-                    if item.enabled and item.visible and abs(item.z - player_z) < radius:
+                    if item.enabled and item.visible and abs(item.z - player_z) <= radius:
                         nearby.append(item)
         return nearby
 

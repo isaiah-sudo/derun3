@@ -1,4 +1,4 @@
-﻿import math
+import math
 import time
 from ursina import Entity, Vec3, color, destroy, held_keys
 from ursina import time as ursina_time
@@ -33,6 +33,9 @@ class Player(Entity):
         self.is_boosting = False
         self.boost_timer = 0.0
         self.boost_stacks = 0
+
+        # Ammo state & Stacking
+        self.ammo = 0
 
         # Stats
         self.skin_index = skin_index % len(SHIP_SKINS)
@@ -120,6 +123,25 @@ class Player(Entity):
             enabled=False
         )
 
+        # Laser Cannons
+        self.cannon_l = Entity(
+            parent=self,
+            model='cube',
+            color=color.hex('#ff0055'),
+            scale=(0.14, 0.14, 1.0),
+            position=(-0.9, -0.05, 0.4)
+        )
+        self.cannon_r = Entity(
+            parent=self,
+            model='cube',
+            color=color.hex('#ff0055'),
+            scale=(0.14, 0.14, 1.0),
+            position=(0.9, -0.05, 0.4)
+        )
+
+        # Laser Weapon Cooldown
+        self.laser_cooldown = 0.0
+
     def change_skin(self, index):
         self.skin_index = index % len(SHIP_SKINS)
         self.skin_data = SHIP_SKINS[self.skin_index]
@@ -146,6 +168,11 @@ class Player(Entity):
             self.is_sliding = False
             return True
         return False
+
+    def launch_ramp(self, force=24.0):
+        self.vy = force
+        self.is_grounded = False
+        self.is_sliding = False
 
     def slide(self):
         if not self.is_sliding:
@@ -188,6 +215,17 @@ class Player(Entity):
         self.magnet_aura.enabled = True
         self.magnet_aura.scale = 3.6 + (self.magnet_stacks * 0.8)
 
+    def add_ammo(self, count=5):
+        from game.config import MAX_AMMO
+        self.ammo = min(MAX_AMMO, self.ammo + count)
+        return self.ammo
+
+    def consume_ammo(self):
+        if self.ammo > 0:
+            self.ammo -= 1
+            return True
+        return False
+
     def activate_boost(self, duration=5.0, stack=False):
         self.is_boosting = True
         if stack:
@@ -198,6 +236,9 @@ class Player(Entity):
             self.boost_timer = duration
 
     def update_player(self, dt):
+        if self.laser_cooldown > 0:
+            self.laser_cooldown = max(0.0, self.laser_cooldown - dt)
+
         dx = self.target_x - self.x
         self.x += dx * LANE_LERP_SPEED * dt
 
